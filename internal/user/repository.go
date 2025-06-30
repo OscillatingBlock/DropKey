@@ -4,13 +4,15 @@ import (
 	"context"
 	"log/slog"
 
+	"Drop-Key/internal/models"
+
 	"github.com/uptrace/bun"
 )
 
 type UserRepository interface {
-	Create(ctx context.Context, user *User) error
-	GetByID(ctx context.Context, id string) (*User, error)
-	GetByPublicKey(ctx context.Context, public_key string) (*User, error)
+	Create(ctx context.Context, user *models.User) error
+	GetByID(ctx context.Context, id string) (*models.User, error)
+	GetByPublicKey(ctx context.Context, public_key string) (*models.User, error)
 }
 
 type userRepository struct {
@@ -23,7 +25,7 @@ func NewUserRepositry(db *bun.DB) *userRepository {
 	}
 }
 
-func (r *userRepository) Create(ctx context.Context, user *User) error {
+func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	_, err := r.db.NewInsert().Model(user).Exec(ctx)
 	if err != nil {
 		slog.Error("Error while inserting user", "operation", "create", "userid", user.ID)
@@ -32,8 +34,8 @@ func (r *userRepository) Create(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) {
-	var user User
+func (r *userRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
+	var user models.User
 	err := r.db.NewSelect().Model(&user).Where("id = ?", id).Scan(ctx)
 	if err != nil {
 		slog.Error("Error while getting user", "operation", "get", "userID", id, "error", err)
@@ -42,8 +44,8 @@ func (r *userRepository) GetByID(ctx context.Context, id string) (*User, error) 
 	return &user, nil
 }
 
-func (r *userRepository) GetByPublicKey(ctx context.Context, public_key string) (*User, error) {
-	var user User
+func (r *userRepository) GetByPublicKey(ctx context.Context, public_key string) (*models.User, error) {
+	var user models.User
 	err := r.db.NewSelect().Model(&user).Where("public_key = ?", public_key).Scan(ctx)
 	if err != nil {
 		slog.Error("Error while getting user", "opearation", "get", "public_key", public_key[:8], "error", err)

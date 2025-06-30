@@ -7,8 +7,7 @@ import (
 	"log/slog"
 	"os"
 
-	"Drop-Key/internal/paste"
-	"Drop-Key/internal/user"
+	"Drop-Key/internal/models"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/uptrace/bun"
@@ -42,14 +41,14 @@ func InitDB(ctx context.Context) (*bun.DB, error) {
 	db.SetMaxOpenConns(100)
 
 	// Initialise Database tables
-	var paste paste.Paste
+	var paste models.Paste
 	_, err = db.NewCreateTable().Model(&paste).IfNotExists().Exec(ctx)
 	if err != nil {
 		slog.Error("Error while creating Paste table", "table", "paste", "error", err)
 		return nil, fmt.Errorf("Error while creating paste table, error %w", err)
 	}
 
-	var user user.User
+	var user models.User
 	_, err = db.NewCreateTable().Model(&user).IfNotExists().Exec(ctx)
 	if err != nil {
 		slog.Error("Error while creating User table", "table", "user", "error", err)

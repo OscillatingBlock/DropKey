@@ -2,15 +2,19 @@ package paste
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
+
+	"Drop-Key/internal/models"
 
 	"github.com/uptrace/bun"
 )
 
 type PasteRepository interface {
-	Create(ctx context.Context, paste *Paste) error
-	GetByID(ctx context.Context, id string) (*Paste, error)
-	Update(ctx context.Context, paste *Paste) error
+	Create(ctx context.Context, paste *models.Paste) error
+	GetByID(ctx context.Context, id string) (*models.Paste, error)
+	Update(ctx context.Context, paste *models.Paste) error
 }
 
 type pasteRepository struct {
@@ -23,7 +27,7 @@ func NewPasteRepository(db *bun.DB) *pasteRepository {
 	}
 }
 
-func (r *pasteRepository) Create(ctx context.Context, paste *Paste) error {
+func (r *pasteRepository) Create(ctx context.Context, paste *models.Paste) error {
 	_, err := r.db.NewInsert().Model(paste).Exec(ctx)
 	if err != nil {
 		slog.Error("Error while inserting paste", "operation", "Create", "pasteid", paste.ID, "error", err)
@@ -32,17 +36,22 @@ func (r *pasteRepository) Create(ctx context.Context, paste *Paste) error {
 	return nil
 }
 
-func (r *pasteRepository) GetByID(ctx context.Context, id string) (*Paste, error) {
-	var paste Paste
-	err := r.db.NewSelect().Model(&paste).Where("id = ? AND expires_at > NOW()", id).Scan(ctx)
+func (r *pasteRepository) GetByID(ctx context.Context, id string) (*models.Paste, error) {
+	var paste models.Paste
+
+	err := r.db.NewSelect().
+		Model(&paste).
+		Where("id = ?", id).
+		Where("expires_at > ?", time.Now().UTC().Truncate(time.Second)).
+		Scan(ctx)
 	if err != nil {
-		slog.Error("Error while getting paste", "pasteid", id, "error", err)
+		slog.Error("Error while getting paste", "operation", "get", "pasteid", id, "error", err)
 		return nil, err
 	}
 	return &paste, nil
 }
 
-func (r *pasteRepository) UpdatePaste(ctx context.Context, paste *Paste) error {
+func (r *pasteRepository) UpdatePaste(ctx context.Context, paste *models.Paste) error {
 	_, err := r.db.NewUpdate().Model(paste).Where("id = ?").Exec(ctx)
 	if err != nil {
 		slog.Error("Error while updating paste", "operation", "update", "pasteid", paste.ID, "error", err)

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"Drop-Key/internal/paste"
-	"Drop-Key/internal/user"
+	"Drop-Key/internal/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,14 +32,14 @@ func TestInitDB(t *testing.T) {
 		assert.NotNil(t, db, "should return a non-nil database object")
 
 		// Test table creation by inserting a User and Paste
-		user := &user.User{
+		user := &models.User{
 			ID:        "test-user",
 			PublicKey: "test-public-key",
 		}
 		_, err = db.NewInsert().Model(user).Exec(ctx)
 		assert.NoError(t, err, "should insert a user without error")
 
-		paste := &paste.Paste{
+		paste := &models.Paste{
 			ID:         "test-paste",
 			Ciphertext: "encrypted-data",
 			Signature:  "signed-data",
