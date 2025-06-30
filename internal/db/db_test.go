@@ -1,3 +1,4 @@
+// NOTE AI SLOP
 package db
 
 import (
@@ -103,4 +104,3 @@ func TestInitDB(t *testing.T) {
 		assert.Nil(t, db, "should return nil database object on error")
 	})
 }
-
