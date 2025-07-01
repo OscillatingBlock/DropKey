@@ -186,7 +186,6 @@ func TestGetByPublicKey(t *testing.T) {
 	assert.Equal(t, paste1.ID, pastes[0].ID, "first paste ID should match")
 	assert.Equal(t, paste2.ID, pastes[1].ID, "second paste ID should match")
 
-	// Test expired paste
 	expiredPaste := &models.Paste{
 		ID:         "expired-paste",
 		Ciphertext: "expired-data",
