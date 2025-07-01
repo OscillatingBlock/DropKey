@@ -10,30 +10,36 @@ import (
 	"Drop-Key/internal/models"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/uptrace/bun"
 )
 
-func TestNewPasteRespository(t *testing.T) {
+func setupTestDB(t *testing.T) (*bun.DB, *pasteRepository, func()) {
+	t.Helper()
 	ctx := context.Background()
 	os.Setenv("DSN", "testuser:testpass@tcp(localhost:3306)/testdb?parseTime=true")
 	db, err := db.InitDB(ctx)
-	assert.NoError(t, err, "should initialise database")
-	assert.NotNil(t, db, "should return a not-nil database")
-	defer db.Close()
-
+	assert.NoError(t, err, "should initialize database")
 	repo := NewPasteRepository(db)
+	cleanup := func() {
+		_, err := db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
+		assert.NoError(t, err, "should drop Paste table")
+		db.Close()
+	}
+	return db, repo, cleanup
+}
+
+func TestNewPasteRespository(t *testing.T) {
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
 	assert.NotNil(t, repo, "should return a not-nil repository.")
 	assert.Equal(t, db, repo.db, "should set correct database instance.")
 }
 
 func TestCreatePaste(t *testing.T) {
-	ctx := context.Background()
-	os.Setenv("DSN", "testuser:testpass@tcp(localhost:3306)/testdb?parseTime=true")
-	db, err := db.InitDB(ctx)
-	assert.NoError(t, err, "should initialise database")
-	assert.NotNil(t, db, "should return a not-nil database")
-	defer db.Close()
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
 
-	repo := NewPasteRepository(db)
 	paste := &models.Paste{
 		ID:         "test-paste",
 		Ciphertext: "encrypted-data",
@@ -42,7 +48,9 @@ func TestCreatePaste(t *testing.T) {
 		ExpiresAt:  time.Now().UTC().Add(time.Hour).Truncate(time.Second),
 	}
 
-	err = repo.Create(ctx, paste)
+	ctx := context.Background()
+
+	err := repo.Create(ctx, paste)
 	assert.NoError(t, err, "should create paste without error.")
 
 	var fetched models.Paste
@@ -59,13 +67,9 @@ func TestCreatePaste(t *testing.T) {
 
 func TestGetByIDPaste(t *testing.T) {
 	ctx := context.Background()
-	os.Setenv("DSN", "testuser:testpass@tcp(localhost:3306)/testdb?parseTime=true")
-	db, err := db.InitDB(ctx)
-	assert.NoError(t, err, "should initialise database")
-	assert.NotNil(t, db, "should return a not-nil database")
-	defer db.Close()
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
 
-	repo := NewPasteRepository(db)
 	paste := &models.Paste{
 		ID:         "test-paste",
 		Ciphertext: "encrypted-data",
@@ -75,7 +79,7 @@ func TestGetByIDPaste(t *testing.T) {
 	}
 	id_string := paste.ID
 
-	err = repo.Create(ctx, paste)
+	err := repo.Create(ctx, paste)
 	assert.NoError(t, err, "should create paste without error.")
 
 	var fetched *models.Paste
@@ -86,19 +90,34 @@ func TestGetByIDPaste(t *testing.T) {
 	assert.Equal(t, paste.PublicKey, fetched.PublicKey, "public_key should match")
 	assert.WithinDuration(t, paste.ExpiresAt, fetched.ExpiresAt, time.Second, "expires_at should match")
 
+	expiredPaste := &models.Paste{
+		ID:         "expired-paste",
+		Ciphertext: "expired-data",
+		Signature:  "expired-signature",
+		PublicKey:  "test-public-key",
+		ExpiresAt:  time.Now().UTC().Add(-time.Hour).Truncate(time.Second),
+	}
+	err = repo.Create(ctx, expiredPaste)
+	assert.NoError(t, err, "should insert expired paste")
+
+	fetched, err = repo.GetByID(ctx, expiredPaste.ID)
+	assert.ErrorIs(t, err, ErrPasteExpired, "should return ErrPasteExpired for expired paste")
+	assert.Nil(t, fetched, "should return nil for expired paste")
+
+	fetched, err = repo.GetByID(ctx, "non-existent")
+	assert.Error(t, err, "should return error for non-existent paste")
+	assert.NotErrorIs(t, err, ErrPasteExpired, "error should not be ErrPasteExpired for non-existent paste")
+	assert.Nil(t, fetched, "should return nil for non-existent paste")
+
 	_, err = db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
 	assert.NoError(t, err, "should drop Paste table")
 }
 
 func TestUpdatePaste(t *testing.T) {
 	ctx := context.Background()
-	os.Setenv("DSN", "testuser:testpass@tcp(localhost:3306)/testdb?parseTime=true")
-	db, err := db.InitDB(ctx)
-	assert.NoError(t, err, "should initialise database")
-	assert.NotNil(t, db, "should return a not-nil database")
-	defer db.Close()
+	db, repo, cleanup := setupTestDB(t)
+	defer cleanup()
 
-	repo := NewPasteRepository(db)
 	paste := &models.Paste{
 		ID:         "test-paste",
 		Ciphertext: "encrypted-data",
@@ -108,7 +127,7 @@ func TestUpdatePaste(t *testing.T) {
 	}
 	id_string := paste.ID
 
-	err = repo.Create(ctx, paste)
+	err := repo.Create(ctx, paste)
 	assert.NoError(t, err, "should create paste without error.")
 
 	var fetched *models.Paste
@@ -122,7 +141,7 @@ func TestUpdatePaste(t *testing.T) {
 	paste.Ciphertext = "updated-encrypted-data"
 	paste.Signature = "updated-signed-data"
 
-	err = repo.UpdatePaste(ctx, paste)
+	err = repo.Update(ctx, paste)
 
 	var fetchedAgain *models.Paste
 	fetchedAgain, err = repo.GetByID(ctx, id_string)
@@ -135,3 +154,51 @@ func TestUpdatePaste(t *testing.T) {
 	_, err = db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
 	assert.NoError(t, err, "should drop Paste table")
 }
+
+func TestGetByPublicKey(t *testing.T) {
+	_, repo, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	paste1 := &models.Paste{
+		ID:         "test-paste-1",
+		Ciphertext: "encrypted-data-1",
+		Signature:  "signed-data-1",
+		PublicKey:  "test-public-key",
+		ExpiresAt:  time.Now().UTC().Add(time.Hour).Truncate(time.Second),
+	}
+	paste2 := &models.Paste{
+		ID:         "test-paste-2",
+		Ciphertext: "encrypted-data-2",
+		Signature:  "signed-data-2",
+		PublicKey:  "test-public-key",
+		ExpiresAt:  time.Now().UTC().Add(time.Hour).Truncate(time.Second),
+	}
+
+	err := repo.Create(ctx, paste1)
+	assert.NoError(t, err, "should create first paste without error")
+	err = repo.Create(ctx, paste2)
+	assert.NoError(t, err, "should create second paste without error")
+
+	pastes, err := repo.GetByPublicKey(ctx, "test-public-key")
+	assert.NoError(t, err, "should retrieve pastes without error")
+	assert.Len(t, pastes, 2, "should return two pastes")
+	assert.Equal(t, paste1.ID, pastes[0].ID, "first paste ID should match")
+	assert.Equal(t, paste2.ID, pastes[1].ID, "second paste ID should match")
+
+	// Test expired paste
+	expiredPaste := &models.Paste{
+		ID:         "expired-paste",
+		Ciphertext: "expired-data",
+		Signature:  "expired-signature",
+		PublicKey:  "test-public-key",
+		ExpiresAt:  time.Now().UTC().Add(-time.Hour).Truncate(time.Second),
+	}
+	err = repo.Create(ctx, expiredPaste)
+	assert.NoError(t, err, "should create expired paste")
+
+	pastes, err = repo.GetByPublicKey(ctx, "test-public-key")
+	assert.NoError(t, err, "should retrieve pastes without error")
+	assert.Len(t, pastes, 2, "should return only non-expired pastes")
+}
+
