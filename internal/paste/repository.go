@@ -51,7 +51,7 @@ func (r *pasteRepository) GetByID(ctx context.Context, id string) (*models.Paste
 }
 
 func (r *pasteRepository) UpdatePaste(ctx context.Context, paste *models.Paste) error {
-	_, err := r.db.NewUpdate().Model(paste).Where("id = ?").Exec(ctx)
+	_, err := r.db.NewUpdate().Model(paste).Where("id = ?", paste.ID).Exec(ctx)
 	if err != nil {
 		slog.Error("Error while updating paste", "operation", "update", "pasteid", paste.ID, "error", err)
 		return err
