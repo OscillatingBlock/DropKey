@@ -17,6 +17,7 @@ type PasteService interface {
 	Create(ctx context.Context, paste *models.Paste, expires_in int) (string, error)
 	GetByID(ctx context.Context, id string) (*models.Paste, error)
 	Update(ctx context.Context, paste *models.Paste) error
+	GetByPublicKey(ctx context.Context, publicKey string) ([]*models.Paste, error)
 }
 
 type pasteService struct {
@@ -31,7 +32,7 @@ func NewPasteService(repo PasteRepository, userRepo user.UserRepository) *pasteS
 	}
 }
 
-func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_in int) (id string, err error) {
+func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_in int) (string, error) {
 	expires_at := time.Now().UTC().Add(time.Duration(expires_in))
 	if time.Now().UTC().Compare(expires_at) != -1 {
 		return "", fmt.Errorf("Invalid paste, expired already.")
@@ -50,6 +51,7 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 	if err != nil {
 		return "", fmt.Errorf("Invalid paste, Ciphertext not base64 encrypted.")
 	}
+
 	if paste.Signature == "" {
 		return "", fmt.Errorf("Invalid paste, empty Signature")
 	}
@@ -57,10 +59,19 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 	if err != nil {
 		return "", fmt.Errorf("Invalid paste, Signature not base64 encrypted.")
 	}
+	if len(signature) != ed25519.SignatureSize {
+		return "", fmt.Errorf("Invalid size of signature")
+	}
 
+	if paste.PublicKey == "" {
+		return "", fmt.Errorf("Invalid Paste, empty PublicKey.")
+	}
 	publicKey, err := base64.StdEncoding.DecodeString(paste.PublicKey)
 	if err != nil {
 		return "", fmt.Errorf("Invalid paste, publicKey not base64 encrypted.")
+	}
+	if len(publicKey) != ed25519.PublicKeySize {
+		return "", fmt.Errorf("Invalid size of public key")
 	}
 
 	_, err = p.userRepo.GetByPublicKey(ctx, paste.PublicKey)
@@ -68,15 +79,7 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 		return "", fmt.Errorf("Could not insert paste, user does not exist.")
 	}
 
-	if len([]byte(publicKey)) != ed25519.PublicKeySize {
-		return "", fmt.Errorf("Invalid size of public key")
-	}
-
-	if len([]byte(signature)) != ed25519.SignatureSize {
-		return "", fmt.Errorf("Invalid size of signature")
-	}
-
-	ok := ed25519.Verify([]byte(publicKey), []byte(ciphertext), []byte(signature))
+	ok := ed25519.Verify(publicKey, ciphertext, signature)
 	if !ok {
 		return "", fmt.Errorf("Invalid Signature.")
 	}
@@ -88,4 +91,51 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 		return "", err
 	}
 	return paste.ID, nil
+}
+
+func (p *pasteService) GetByID(ctx context.Context, id string) (paste *models.Paste, err error) {
+	if id == "" {
+		return nil, fmt.Errorf("Cannot get paste, Invalid id, id = %v", id)
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, fmt.Errorf("invalid paste id: %v", err)
+	}
+	paste, err = p.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if paste == nil {
+		return nil, fmt.Errorf("Paste not found, paste id = %v", id)
+	}
+	return paste, err
+}
+
+func (p *pasteService) GetByPublicKey(ctx context.Context, publicKey string) ([]*models.Paste, error) {
+	if publicKey == "" {
+		return nil, fmt.Errorf("Cannot get pastes, Empty publicKey")
+	}
+
+	base64publicKey, err := base64.StdEncoding.DecodeString(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get pastes, Invalid publicKey, not base64 encrypted.")
+	}
+	if len(base64publicKey) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("Invalid size of public key")
+	}
+
+	userWithPublicKey, err := p.userRepo.GetByPublicKey(ctx, publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get pastes, user with this PublicKey not found.")
+	}
+
+	if publicKey != userWithPublicKey.PublicKey {
+		return nil, fmt.Errorf("Cannot get pastes, UNauthorized access.")
+	}
+
+	pastes, err := p.repo.GetByPublicKey(ctx, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pastes, nil
 }

@@ -15,6 +15,7 @@ type PasteRepository interface {
 	Create(ctx context.Context, paste *models.Paste) error
 	GetByID(ctx context.Context, id string) (*models.Paste, error)
 	Update(ctx context.Context, paste *models.Paste) error
+	GetByPublicKey(ctx context.Context, publicKey string) ([]*models.Paste, error)
 }
 
 type pasteRepository struct {
