@@ -19,7 +19,7 @@ func TestNewUserRespository(t *testing.T) {
 	assert.NotNil(t, db, "should return a not-nil database")
 	defer db.Close()
 
-	repo := NewUserRepositry(db)
+	repo := NewUserRepository(db)
 	assert.NotNil(t, repo, "should return a not-nil repository.")
 	assert.Equal(t, db, repo.db, "should set correct database instance.")
 }
@@ -32,7 +32,7 @@ func TestCreateUser(t *testing.T) {
 	assert.NotNil(t, db, "should return a not-nil database")
 	defer db.Close()
 
-	repo := NewUserRepositry(db)
+	repo := NewUserRepository(db)
 	user := &models.User{
 		ID:        "user_id",
 		PublicKey: "public_key",
@@ -59,7 +59,7 @@ func TestGetUserById(t *testing.T) {
 	assert.NotNil(t, db, "should return a not-nil database")
 	defer db.Close()
 
-	repo := NewUserRepositry(db)
+	repo := NewUserRepository(db)
 	user := &models.User{
 		ID:        "user_id",
 		PublicKey: "public_key",
@@ -86,7 +86,7 @@ func TestGetUserByPublicKey(t *testing.T) {
 	assert.NotNil(t, db, "should return a not-nil database")
 	defer db.Close()
 
-	repo := NewUserRepositry(db)
+	repo := NewUserRepository(db)
 	user := &models.User{
 		ID:        "user_id",
 		PublicKey: "public_key",
@@ -104,3 +104,4 @@ func TestGetUserByPublicKey(t *testing.T) {
 	_, err = db.NewDropTable().Model(&models.User{}).IfExists().Exec(ctx)
 	assert.NoError(t, err, "should drop User table")
 }
+
