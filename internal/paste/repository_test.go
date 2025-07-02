@@ -60,14 +60,11 @@ func TestCreatePaste(t *testing.T) {
 	assert.Equal(t, paste.Signature, fetched.Signature, "signature should match")
 	assert.Equal(t, paste.PublicKey, fetched.PublicKey, "public_key should match")
 	assert.WithinDuration(t, paste.ExpiresAt, fetched.ExpiresAt, time.Second, "expires_at should match")
-
-	_, err = db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
-	assert.NoError(t, err, "should drop Paste table")
 }
 
 func TestGetByIDPaste(t *testing.T) {
 	ctx := context.Background()
-	db, repo, cleanup := setupTestDB(t)
+	_, repo, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	paste := &models.Paste{
@@ -108,14 +105,11 @@ func TestGetByIDPaste(t *testing.T) {
 	assert.Error(t, err, "should return error for non-existent paste")
 	assert.NotErrorIs(t, err, ErrPasteExpired, "error should not be ErrPasteExpired for non-existent paste")
 	assert.Nil(t, fetched, "should return nil for non-existent paste")
-
-	_, err = db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
-	assert.NoError(t, err, "should drop Paste table")
 }
 
 func TestUpdatePaste(t *testing.T) {
 	ctx := context.Background()
-	db, repo, cleanup := setupTestDB(t)
+	_, repo, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	paste := &models.Paste{
@@ -150,9 +144,6 @@ func TestUpdatePaste(t *testing.T) {
 	assert.Equal(t, paste.Signature, fetchedAgain.Signature, "signature should be equal")
 	assert.Equal(t, paste.PublicKey, fetchedAgain.PublicKey, "public_key should match")
 	assert.WithinDuration(t, paste.ExpiresAt, fetchedAgain.ExpiresAt, time.Second, "expires_at should match")
-
-	_, err = db.NewDropTable().Model(&models.Paste{}).IfExists().Exec(ctx)
-	assert.NoError(t, err, "should drop Paste table")
 }
 
 func TestGetByPublicKey(t *testing.T) {
@@ -200,4 +191,3 @@ func TestGetByPublicKey(t *testing.T) {
 	assert.NoError(t, err, "should retrieve pastes without error")
 	assert.Len(t, pastes, 2, "should return only non-expired pastes")
 }
-

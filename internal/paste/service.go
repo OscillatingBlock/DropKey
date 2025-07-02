@@ -33,15 +33,15 @@ func NewPasteService(repo PasteRepository, userRepo user.UserRepository) *pasteS
 }
 
 func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_in int) (string, error) {
-	expires_at := time.Now().UTC().Add(time.Duration(expires_in))
+	expires_at := time.Now().UTC().Add(time.Second * time.Duration(expires_in)).Truncate(time.Second)
 	if time.Now().UTC().Compare(expires_at) != -1 {
 		return "", fmt.Errorf("Invalid paste, expired already.")
 	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
 	if time.Now().UTC().Add(time.Second*604800).Compare(expires_at) != 1 {
 		return "", fmt.Errorf("Expiry date of paste too long.")
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 
 	if paste.Ciphertext == "" {
@@ -86,6 +86,7 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 
 	paste.ID = uuid.NewString()
 	paste.ExpiresAt = expires_at
+
 	err = p.repo.Create(ctx, paste)
 	if err != nil {
 		return "", err
