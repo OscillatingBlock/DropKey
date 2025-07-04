@@ -72,12 +72,17 @@ func (u *userService) Authenticate(ctx context.Context, userID, signature, chall
 	if err != nil || len(sig) != ed25519.SignatureSize {
 		return false, utils.WrapError(utils.ErrInvalidSignature, "Auth failed, error ")
 	}
+
 	user, err := u.repo.GetByID(ctx, userID)
 	if err != nil {
 		return false, utils.WrapError(utils.ErrUserNotFound, "Auth failed, error ")
 	}
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(user.PublicKey)
+	if err != nil || len(pubKeyBytes) != ed25519.PublicKeySize {
+		return false, utils.WrapError(utils.ErrInvalidPublicKey, "Auth failed, public key invalid")
+	}
 
-	ok := ed25519.Verify(ed25519.PublicKey(user.PublicKey), []byte(challenge), sig)
+	ok := ed25519.Verify(pubKeyBytes, []byte(challenge), sig)
 	if !ok {
 		return false, utils.WrapError(utils.ErrInvalidSignature, "Auth failed, error ")
 	}
@@ -101,6 +106,24 @@ func (u *userService) GetByPublicKey(ctx context.Context, publicKey string) (*mo
 	user, err := u.repo.GetByPublicKey(ctx, publicKey)
 	if err != nil {
 		return nil, utils.WrapError(utils.ErrUserNotFound, "Cannot get user by public key")
+	}
+
+	return user, nil
+}
+
+func (u *userService) GetByID(ctx context.Context, id string) (*models.User, error) {
+	if id == "" {
+		return nil, utils.WrapError(utils.ErrEmptyUserID, "cannot get user, error")
+	}
+
+	_, err := uuid.Parse(id)
+	if err != nil {
+		return nil, utils.WrapError(utils.ErrInvalidUserID, "cannot get user, error")
+	}
+
+	user, err := u.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, utils.WrapError(utils.ErrUserNotFound, "cannot get user by id, error")
 	}
 
 	return user, nil
