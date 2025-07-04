@@ -17,11 +17,6 @@ import (
 
 var publicKey string
 
-func init() {
-	_, pub, _ := ed25519.GenerateKey(nil)
-	publicKey = base64.StdEncoding.EncodeToString(pub)
-}
-
 func setupTestService(t *testing.T) (*userService, context.Context, func()) {
 	t.Helper()
 
@@ -94,3 +89,5 @@ func TestCreateUser(t *testing.T) {
 	})
 }
 
+func TestUpdate(t *testing.T) {
+}
