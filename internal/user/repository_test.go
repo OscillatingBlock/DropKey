@@ -24,7 +24,7 @@ func TestNewUserRespository(t *testing.T) {
 	assert.Equal(t, db, repo.db, "should set correct database instance.")
 }
 
-func TestCreateUser(t *testing.T) {
+func TestCreate(t *testing.T) {
 	ctx := context.Background()
 	os.Setenv("DSN", "testuser:testpass@tcp(localhost:3306)/testdb?parseTime=true")
 	db, err := db.InitDB(ctx)
@@ -104,4 +104,3 @@ func TestGetUserByPublicKey(t *testing.T) {
 	_, err = db.NewDropTable().Model(&models.User{}).IfExists().Exec(ctx)
 	assert.NoError(t, err, "should drop User table")
 }
-
