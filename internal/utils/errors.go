@@ -1,6 +1,9 @@
 package utils
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	ErrPasteExpiredAlready               = errors.New("paste has already expired")
@@ -22,3 +25,28 @@ var (
 	ErrUserNotFoundForPublicKey = errors.New("user with specified public key not found")
 	ErrUnauthorizedAccess       = errors.New("unauthorized access to pastes")
 )
+
+var (
+	ErrInvalidSignature = errors.New("Invalid signature")
+	ErrEmptySignature   = errors.New("Empty signature")
+)
+
+var (
+	ErrInvalidInput   = errors.New("invalid input provided")
+	ErrDatabase       = errors.New("database operation failed")
+	ErrInternalServer = errors.New("internal server error")
+	ErrNotFound       = errors.New("resource not found")
+)
+
+var (
+	ErrDuplicatePublicKey   = errors.New("public key already exists")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrInvalidUserID        = errors.New("invalid User ID")
+	ErrEmptyUserID          = errors.New("empty user ID")
+	ErrAuthenticationFailed = errors.New("authentication failed")
+	ErrValidationError      = errors.New("validation error")
+)
+
+func WrapError(err error, message string) error {
+	return fmt.Errorf("%s: %w", message, err)
+}
