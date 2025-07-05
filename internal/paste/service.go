@@ -123,7 +123,7 @@ func (p *pasteService) GetByPublicKey(ctx context.Context, publicKey string) ([]
 
 	pastes, err := p.repo.GetByPublicKey(ctx, publicKey)
 	if err != nil {
-		return nil, err
+		return nil, utils.ErrPasteNotFound
 	}
 	return pastes, nil
 }
