@@ -14,7 +14,7 @@ import (
 
 type UserService interface {
 	Create(ctx context.Context, user *models.User) (string, error)
-	Authenticate(ctx context.Context, userID, signature string, challenge []byte) (bool, error)
+	Authenticate(ctx context.Context, userID, signature, challenge string) (bool, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)
 	GetByPublicKey(ctx context.Context, publicKey string) (*models.User, error)
 }
@@ -48,7 +48,7 @@ func (u *userService) CreateUser(ctx context.Context, user *models.User) (string
 
 	err = u.repo.Create(ctx, user)
 	if err != nil {
-		return "", err
+		return "", utils.WrapError(utils.ErrUserCreationFailed, "Failed to create user")
 	}
 
 	return user.ID, nil
