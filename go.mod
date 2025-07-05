@@ -5,7 +5,6 @@ go 1.24.4
 require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
-	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/stretchr/testify v1.10.0
 	github.com/uptrace/bun v1.2.14
