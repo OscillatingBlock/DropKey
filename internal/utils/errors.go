@@ -45,6 +45,7 @@ var (
 	ErrEmptyUserID          = errors.New("empty user ID")
 	ErrAuthenticationFailed = errors.New("authentication failed")
 	ErrValidationError      = errors.New("validation error")
+	ErrUserCreationFailed   = errors.New("user creation failed")
 )
 
 func WrapError(err error, message string) error {
