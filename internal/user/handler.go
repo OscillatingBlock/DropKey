@@ -1,6 +1,7 @@
 package user
 
 import (
+	"errors"
 	"net/http"
 
 	"Drop-Key/internal/models"
@@ -9,8 +10,21 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type UserHandler struct {
+type UserHandler interface {
+	RegisterHandler(c echo.Context) error
+	AuthenticateHandler(c echo.Context) error
+	GetByIDHandler(c echo.Context) error
+	GetByPublicKeyHandler(c echo.Context) error
+}
+
+type userHandler struct {
 	service UserService
+}
+
+func NewUserHandler(service UserService) *userHandler {
+	return &userHandler{
+		service: service,
+	}
 }
 
 type pub struct {
@@ -18,16 +32,16 @@ type pub struct {
 }
 
 type ID struct {
-	ID string `json:"id"`
+	Id string `json:"id"`
 }
 
 type AuthRequest struct {
-	ID        string `json:"ID"`
+	ID        string `json:"id"`
 	Signature string `json:"signature"`
 	Challenge string `json:"challenge"`
 }
 
-func (h *UserHandler) RegisterHandler(c echo.Context) error {
+func (h *userHandler) RegisterHandler(c echo.Context) error {
 	pub := &pub{}
 	err := c.Bind(pub)
 	if err != nil {
@@ -42,7 +56,7 @@ func (h *UserHandler) RegisterHandler(c echo.Context) error {
 
 	case nil:
 		response := &ID{
-			ID: id,
+			Id: id,
 		}
 		return c.JSON(http.StatusCreated, response)
 
@@ -55,12 +69,15 @@ func (h *UserHandler) RegisterHandler(c echo.Context) error {
 	case utils.ErrUserCreationFailed:
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 
+	case utils.ErrDuplicatePublicKey:
+		return echo.NewHTTPError(http.StatusBadRequest, "User already exists")
+
 	default:
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
 }
 
-func (h *UserHandler) AuthenticateHandler(c echo.Context) error {
+func (h *userHandler) AuthenticateHandler(c echo.Context) error {
 	req := &AuthRequest{}
 	if err := c.Bind(req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
@@ -72,22 +89,22 @@ func (h *UserHandler) AuthenticateHandler(c echo.Context) error {
 	case err == nil && ok:
 		return c.JSON(http.StatusOK, map[string]string{"message": "Authentication successful"})
 
-	case err == utils.ErrEmptyUserID:
+	case errors.Is(err, utils.ErrEmptyUserID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing user ID")
 
-	case err == utils.ErrValidationError:
+	case errors.Is(err, utils.ErrValidationError):
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing or invalid challenge")
 
-	case err == utils.ErrEmptySignature:
+	case errors.Is(err, utils.ErrEmptySignature):
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing signature")
 
-	case err == utils.ErrInvalidSignature:
+	case errors.Is(err, utils.ErrInvalidSignature):
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid signature")
 
-	case err == utils.ErrUserNotFound:
+	case errors.Is(err, utils.ErrUserNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 
-	case err == utils.ErrInvalidPublicKey:
+	case errors.Is(err, utils.ErrInvalidPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
 
 	case err != nil:
@@ -97,14 +114,17 @@ func (h *UserHandler) AuthenticateHandler(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusUnauthorized, "Authentication failed")
 }
 
-func (h *UserHandler) GetByPublicKeyHandler(c echo.Context) error {
-	publicKey := &pub{}
+func (h *userHandler) GetByPublicKeyHandler(c echo.Context) error {
+	publicKey := c.QueryParam("publickey")
+	if publicKey == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "Missing public key")
+	}
 	err := c.Bind(publicKey)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
 	}
 
-	user, err := h.service.GetByPublicKey(c.Request().Context(), publicKey.PublicKey)
+	user, err := h.service.GetByPublicKey(c.Request().Context(), publicKey)
 
 	switch err {
 	case nil:
@@ -123,13 +143,16 @@ func (h *UserHandler) GetByPublicKeyHandler(c echo.Context) error {
 	}
 }
 
-func (h *UserHandler) GetByIDHandler(c echo.Context) error {
-	id := &ID{}
+func (h *userHandler) GetByIDHandler(c echo.Context) error {
+	id := c.Param("id")
+	if id == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "Missing user ID")
+	}
 	err := c.Bind(id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
 	}
-	user, err := h.service.GetByID(c.Request().Context(), id.ID)
+	user, err := h.service.GetByID(c.Request().Context(), id)
 
 	switch err {
 	case nil:
