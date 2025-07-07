@@ -55,7 +55,7 @@ func TestCreateUser(t *testing.T) {
 		user := &models.User{
 			PublicKey: validPublicKey,
 		}
-		id, err := userService.CreateUser(ctx, user)
+		id, err := userService.Create(ctx, user)
 		assert.NoError(t, err, "should create user without error")
 		assert.NotEmpty(t, id, "should return a non-empty user ID")
 		_, err = uuid.Parse(id)
@@ -74,7 +74,7 @@ func TestCreateUser(t *testing.T) {
 		user := &models.User{
 			PublicKey: "",
 		}
-		id, err := userService.CreateUser(ctx, user)
+		id, err := userService.Create(ctx, user)
 		assert.ErrorIs(t, err, utils.ErrEmptyPublicKey, "should return error")
 		assert.Empty(t, id, "should return empty id")
 	})
@@ -83,7 +83,7 @@ func TestCreateUser(t *testing.T) {
 		user := &models.User{
 			PublicKey: "invalid-public-key",
 		}
-		id, err := userService.CreateUser(ctx, user)
+		id, err := userService.Create(ctx, user)
 		assert.ErrorIs(t, err, utils.ErrInvalidPublicKey, "should retur error")
 		assert.Empty(t, id, "should return empty id")
 	})
@@ -101,7 +101,7 @@ func TestGetByID(t *testing.T) {
 		user := &models.User{
 			PublicKey: validPublicKey,
 		}
-		id, err := userService.CreateUser(ctx, user)
+		id, err := userService.Create(ctx, user)
 		assert.NoError(t, err, "should create user without error")
 
 		fetchedUser, err := userService.GetByID(ctx, id)
@@ -138,10 +138,11 @@ func TestAuthenticate(t *testing.T) {
 		user := &models.User{
 			PublicKey: validPublicKey,
 		}
-		id, err := userService.CreateUser(ctx, user)
+		id, err := userService.Create(ctx, user)
 		assert.NoError(t, err, "should create user without error")
 
-		ok, err := userService.Authenticate(ctx, id, sig, string(msg))
+		msgB64 := base64.StdEncoding.EncodeToString(msg)
+		ok, err := userService.Authenticate(ctx, id, sig, msgB64)
 		assert.NoError(t, err, "should Authenticate without error")
 		assert.Equal(t, true, ok, "authentication should be true")
 	})
@@ -185,7 +186,7 @@ func TestGetByPublicKey(t *testing.T) {
 		pubB64 := base64.StdEncoding.EncodeToString(pub)
 
 		user := &models.User{PublicKey: pubB64}
-		_, err = userService.CreateUser(ctx, user)
+		_, err = userService.Create(ctx, user)
 		assert.NoError(t, err, "should create user")
 
 		fetched, err := userService.GetByPublicKey(ctx, pubB64)
