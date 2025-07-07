@@ -29,7 +29,7 @@ func NewUserService(repo UserRepository) *userService {
 	}
 }
 
-func (u *userService) CreateUser(ctx context.Context, user *models.User) (string, error) {
+func (u *userService) Create(ctx context.Context, user *models.User) (string, error) {
 	if user.PublicKey == "" {
 		return "", utils.WrapError(utils.ErrEmptyPublicKey, "Cannot create user, error")
 	}
@@ -82,7 +82,13 @@ func (u *userService) Authenticate(ctx context.Context, userID, signature, chall
 		return false, utils.WrapError(utils.ErrInvalidPublicKey, "Auth failed, public key invalid")
 	}
 
-	ok := ed25519.Verify(pubKeyBytes, []byte(challenge), sig)
+	decodedChallenge, err := base64.StdEncoding.DecodeString(challenge)
+	if err != nil {
+		return false, utils.WrapError(utils.ErrValidationError, "Auth failed, invalid base64 challenge")
+	}
+
+	ok := ed25519.Verify(pubKeyBytes, decodedChallenge, sig)
+
 	if !ok {
 		return false, utils.WrapError(utils.ErrInvalidSignature, "Auth failed, error ")
 	}
