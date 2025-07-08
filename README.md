@@ -69,7 +69,7 @@ KeyDrop/
 
 ## Related
 
-- [Endpoints documentation →](./ENDPOINTS.md) *(Coming Soon)*
+- [Endpoints documentation →](./API_DOCS.md) *REFER THIS FOR API DOCS*
 
 ---
 
