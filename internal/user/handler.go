@@ -2,11 +2,16 @@ package user
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 
+	"Drop-Key/internal/middleware"
 	"Drop-Key/internal/models"
 	"Drop-Key/internal/utils"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -28,7 +33,7 @@ func NewUserHandler(service UserService) *userHandler {
 }
 
 type pub struct {
-	PublicKey string `json:"publickey"`
+	PublicKey string `json:"public_key"`
 }
 
 type ID struct {
@@ -67,13 +72,13 @@ func (h *userHandler) RegisterHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
 
 	case utils.ErrUserCreationFailed:
-		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
+		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error.")
 
 	case utils.ErrDuplicatePublicKey:
 		return echo.NewHTTPError(http.StatusBadRequest, "User already exists")
 
 	default:
-		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
+		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error..")
 	}
 }
 
@@ -87,7 +92,34 @@ func (h *userHandler) AuthenticateHandler(c echo.Context) error {
 
 	switch {
 	case err == nil && ok:
-		return c.JSON(http.StatusOK, map[string]string{"message": "Authentication successful"})
+		jwtSecret := os.Getenv("JWTSECRET")
+		if jwtSecret == "" {
+			slog.Error("No JWTSECRET found", "JWTSECRET", jwtSecret)
+		}
+
+		user, err := h.service.GetByID(c.Request().Context(), req.ID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusUnauthorized, "User not found")
+		}
+
+		fmt.Println("creating claims	")
+		fmt.Println("pub key", user.PublicKey)
+		fmt.Println("userid", user.ID)
+		claims := &custom_middleware.JwtCustomClaims{
+			UserInfo: custom_middleware.UserInfo{
+				UserID:    user.ID,
+				Publickey: user.PublicKey,
+			},
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+		t, err := token.SignedString([]byte(jwtSecret))
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Failed to generate token")
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{"message": "Authentication successful", "token": t})
 
 	case errors.Is(err, utils.ErrEmptyUserID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing user ID")
@@ -115,13 +147,9 @@ func (h *userHandler) AuthenticateHandler(c echo.Context) error {
 }
 
 func (h *userHandler) GetByPublicKeyHandler(c echo.Context) error {
-	publicKey := c.QueryParam("publickey")
+	publicKey := c.QueryParam("public_key")
 	if publicKey == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing public key")
-	}
-	err := c.Bind(publicKey)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
 	}
 
 	user, err := h.service.GetByPublicKey(c.Request().Context(), publicKey)
@@ -129,13 +157,14 @@ func (h *userHandler) GetByPublicKeyHandler(c echo.Context) error {
 	switch err {
 	case nil:
 		return c.JSON(http.StatusOK, user)
+
 	case utils.ErrEmptyPublicKey:
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty publickey")
 
 	case utils.ErrInvalidPublicKey:
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid publickey")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key — ensure it is URL-encoded")
 
-	case utils.ErrNotFound:
+	case utils.ErrUserNotFound:
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 
 	default:
@@ -147,10 +176,6 @@ func (h *userHandler) GetByIDHandler(c echo.Context) error {
 	id := c.Param("id")
 	if id == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing user ID")
-	}
-	err := c.Bind(id)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
 	}
 	user, err := h.service.GetByID(c.Request().Context(), id)
 
