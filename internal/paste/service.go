@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"Drop-Key/internal/models"
@@ -16,7 +18,7 @@ import (
 type PasteService interface {
 	Create(ctx context.Context, paste *models.Paste, expires_in int) (string, error)
 	GetByID(ctx context.Context, id string) (*models.Paste, error)
-	Update(ctx context.Context, paste *models.Paste) error
+	Update(ctx context.Context, paste *models.Paste, expires_in int) error
 	GetByPublicKey(ctx context.Context, publicKey string) ([]*models.Paste, error)
 }
 
@@ -55,11 +57,14 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 	if paste.Signature == "" {
 		return "", utils.ErrPasteEmptySignature
 	}
+
 	signature, err := base64.StdEncoding.DecodeString(paste.Signature)
 	if err != nil || len(signature) != ed25519.SignatureSize {
 		return "", utils.ErrPasteInvalidSignature
 	}
 
+	fmt.Printf("Decoded message: %q\n", ciphertext)
+	fmt.Printf("Signature: %x\n", signature)
 	if paste.PublicKey == "" {
 		return "", utils.ErrPasteInvalidPublicKey
 	}
@@ -68,6 +73,7 @@ func (p *pasteService) Create(ctx context.Context, paste *models.Paste, expires_
 		return "", utils.ErrPasteInvalidPublicKey
 	}
 
+	fmt.Printf("PublicKey: %x\n", publicKey)
 	_, err = p.userRepo.GetByPublicKey(ctx, paste.PublicKey)
 	if err != nil {
 		return "", utils.ErrPasteUserNotFound
@@ -128,7 +134,7 @@ func (p *pasteService) GetByPublicKey(ctx context.Context, publicKey string) ([]
 	return pastes, nil
 }
 
-func (p *pasteService) Update(ctx context.Context, paste *models.Paste) error {
+func (p *pasteService) Update(ctx context.Context, paste *models.Paste, expiresIn int) error {
 	if paste.ID == "" {
 		return utils.ErrPasteInvalidID
 	}
@@ -159,5 +165,20 @@ func (p *pasteService) Update(ctx context.Context, paste *models.Paste) error {
 	if !ed25519.Verify(publicKey, ciphertext, signature) {
 		return utils.ErrPasteInvalidSignatureVerification
 	}
+
+	if expiresIn < 0 {
+		return utils.ErrPasteInvalidExpiryTime
+	}
+	expiresAt := time.Now().UTC().Add(time.Second * time.Duration(expiresIn)).Truncate(time.Second)
+
+	if time.Now().UTC().After(expiresAt) {
+		return utils.ErrPasteExpiredAlready
+	}
+	if time.Now().UTC().Add(time.Second * 604800).Before(expiresAt) {
+		return utils.ErrPasteExpiryTooLong
+	}
+
+	paste.ExpiresAt = expiresAt
+	slog.Info("Updating paste expiration", "id", paste.ID, "new_expires_at", paste.ExpiresAt)
 	return p.repo.Update(ctx, paste)
 }

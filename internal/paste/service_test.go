@@ -238,7 +238,10 @@ func TestUpdate(t *testing.T) {
 		paste.Ciphertext = base64.StdEncoding.EncodeToString(new_msg)
 		paste.Signature = base64.StdEncoding.EncodeToString(new_sig)
 
-		err := service.Update(ctx, paste)
+		expiresIn := 200
+		expectedExpiry := time.Now().UTC().Add(time.Duration(expiresIn) * time.Second).Truncate(time.Second)
+
+		err := service.Update(ctx, paste, expiresIn)
 		assert.NoError(t, err, "should update user wihout error.")
 
 		fetched, err := service.GetByID(ctx, id)
@@ -246,7 +249,10 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, id, fetched.ID, "id should match")
 		assert.Equal(t, paste.Ciphertext, fetched.Ciphertext, "ciphertext should match")
 		assert.Equal(t, paste.Signature, fetched.Signature, "signature should match")
+		diff := fetched.ExpiresAt.Sub(expectedExpiry)
+		assert.LessOrEqual(t, diff.Milliseconds(), int64(1000), "expires_at should be close to expected")
 	})
+
 	t.Run("invalid ID", func(t *testing.T) {
 		paste := &models.Paste{
 			ID:         "invalid-uuid",
@@ -254,7 +260,7 @@ func TestUpdate(t *testing.T) {
 			PublicKey:  string(pub),
 			Signature:  base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte("This is an updated sample"))),
 		}
-		err := service.Update(ctx, paste)
+		err := service.Update(ctx, paste, 200)
 		assert.ErrorIs(t, err, utils.ErrPasteInvalidID, "should return ErrPasteInvalidID")
 	})
 
@@ -265,7 +271,17 @@ func TestUpdate(t *testing.T) {
 			PublicKey:  publicKey,
 			Signature:  base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(""))),
 		}
-		err := service.Update(ctx, paste)
+		err := service.Update(ctx, paste, 200)
 		assert.ErrorIs(t, err, utils.ErrPasteEmptyCiphertext, "should return ErrPasteEmptyCiphertext")
+	})
+
+	t.Run("invalid expires in", func(t *testing.T) {
+		new_msg := []byte("This is a new sample secret message")
+		new_sig := ed25519.Sign(priv, new_msg)
+		paste.Ciphertext = base64.StdEncoding.EncodeToString(new_msg)
+		paste.Signature = base64.StdEncoding.EncodeToString(new_sig)
+
+		err := service.Update(ctx, paste, -10)
+		assert.ErrorIs(t, utils.ErrPasteInvalidExpiryTime, err, "should return ErrPasteInvalidExpiryTime")
 	})
 }
