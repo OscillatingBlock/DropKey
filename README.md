@@ -1,8 +1,8 @@
-# Pastebin Service 📝🔐
+# DropKey 
 
 A minimal, end-to-end encrypted pastebin built with Go. This service allows users to create, share, and fetch encrypted messages without requiring email, passwords, or accounts.
 
-## 🔒 Key Features
+## Key Features
 
 - **End-to-End Encryption (E2EE)**  
   All messages are encrypted client-side using the user's public key. The server only stores ciphertext, never plain text.
@@ -22,7 +22,7 @@ A minimal, end-to-end encrypted pastebin built with Go. This service allows user
 - **Expiring Content**  
   Pastes can be set to expire after a certain time. Expired pastes are not returned in responses.
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 
@@ -55,7 +55,7 @@ DropKey/
 
 ````
 
-## ⚙️ Tech Stack
+## Tech Stack
 
 - **Language:** Go 1.21+
 - **Framework:** Echo
