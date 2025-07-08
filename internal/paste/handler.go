@@ -3,29 +3,45 @@ package paste
 import (
 	"net/http"
 	"os"
+	"time"
 
+	custom_middleware "Drop-Key/internal/middleware"
 	"Drop-Key/internal/models"
 	"Drop-Key/internal/utils"
 
 	"github.com/labstack/echo/v4"
 )
 
-type PasteHandler struct {
+type PasterHandlerInterface interface {
+	CreatePaste(c echo.Context) error
+	GetPaste(c echo.Context) error
+	UpdatePaste(c echo.Context) error
+	GetByPublicKey(c echo.Context) error
+}
+
+type pasteHandler struct {
 	service PasteService
+}
+
+func NewPasteHandler(pasteService PasteService) *pasteHandler {
+	return &pasteHandler{
+		service: pasteService,
+	}
 }
 
 type PasteRequest struct {
 	Ciphertext string `json:"ciphertext"`
 	Signature  string `json:"signature"`
-	PublicKey  string `json:"publickey"`
-	Expires_in int    `json:"expiresin"`
+	PublicKey  string `json:"public_key"`
+	Expires_in int    `json:"expires_in"`
 }
 
 type PasteResponse struct {
-	ID         string `json:"ID"`
-	Ciphertext string `json:"ciphertext"`
-	Signature  string `json:"signature"`
-	PublicKey  string `json:"publickey"`
+	ID         string    `json:"ID"`
+	Ciphertext string    `json:"ciphertext"`
+	Signature  string    `json:"signature"`
+	PublicKey  string    `json:"public_key"`
+	Expires_in time.Time `json:"expires_in"`
 }
 
 type Url struct {
@@ -33,13 +49,21 @@ type Url struct {
 }
 
 type PublicKey struct {
-	PublicKey string `json:"publickey"`
+	PublicKey string `json:"public_key"`
 }
 
-func (h *PasteHandler) CreatePaste(c echo.Context) error {
+func (h *pasteHandler) CreatePaste(c echo.Context) error {
 	pasteReq := &PasteRequest{}
 	if err := c.Bind(pasteReq); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid JSON payload")
+	}
+
+	userInfo, ok := c.Get("userInfo").(custom_middleware.UserInfo)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "User info not found in context")
+	}
+	if userInfo.Publickey != pasteReq.PublicKey {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
 	}
 
 	paste := &models.Paste{
@@ -55,7 +79,7 @@ func (h *PasteHandler) CreatePaste(c echo.Context) error {
 	case nil:
 
 	case utils.ErrPasteExpiredAlready:
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid expires_in")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid expiresin, paste expired already")
 	case utils.ErrPasteExpiryTooLong:
 		return echo.NewHTTPError(http.StatusBadRequest, "Expiry date too long")
 	case utils.ErrPasteEmptyCiphertext:
@@ -78,9 +102,10 @@ func (h *PasteHandler) CreatePaste(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
 
-	fetchedUrl := getUrl(id, paste.PublicKey)
-	url := &Url{URL: fetchedUrl}
-	return c.JSON(http.StatusCreated, url)
+	return c.JSON(http.StatusCreated, map[string]string{
+		"id":  paste.ID,
+		"url": getUrl(id, paste.PublicKey),
+	})
 }
 
 func getUrl(id, pub string) string {
@@ -92,7 +117,7 @@ func getUrl(id, pub string) string {
 	return url
 }
 
-func (h *PasteHandler) GetPaste(c echo.Context) error {
+func (h *pasteHandler) GetPaste(c echo.Context) error {
 	id := c.Param("id")
 	if id == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "Missing paste ID")
@@ -112,17 +137,10 @@ func (h *PasteHandler) GetPaste(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
 
-	response := PasteResponse{
-		Ciphertext: paste.Ciphertext,
-		Signature:  paste.Signature,
-		PublicKey:  paste.PublicKey,
-		ID:         paste.ID,
-	}
-
-	return c.JSON(http.StatusOK, response)
+	return c.JSONPretty(http.StatusOK, paste, " ")
 }
 
-func (h *PasteHandler) UpdatePaste(c echo.Context) error {
+func (h *pasteHandler) UpdatePaste(c echo.Context) error {
 	id := c.Param("id")
 	if id == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing paste ID")
@@ -133,6 +151,14 @@ func (h *PasteHandler) UpdatePaste(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid input")
 	}
 
+	userInfo, ok := c.Get("userInfo").(custom_middleware.UserInfo)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "User info not found in context")
+	}
+	if userInfo.Publickey != pasteReq.PublicKey {
+		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
+	}
+
 	paste := &models.Paste{
 		ID:         id,
 		Signature:  pasteReq.Signature,
@@ -141,15 +167,20 @@ func (h *PasteHandler) UpdatePaste(c echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	err := h.service.Update(ctx, paste)
-
+	err := h.service.Update(ctx, paste, pasteReq.Expires_in)
 	switch {
 	case err == utils.ErrPasteNotFound:
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
+
+	case err == utils.ErrPasteInvalidExpiryTime:
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid expires_in")
+
 	case err == utils.ErrUnauthorizedAccess:
 		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
+
 	case err == utils.ErrPasteInvalidCiphertext:
 		return echo.NewHTTPError(http.StatusBadRequest, "Bad request, invalid cipher text")
+
 	case err != nil:
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error, failed to update paste")
 	}
@@ -157,27 +188,30 @@ func (h *PasteHandler) UpdatePaste(c echo.Context) error {
 	return c.String(http.StatusOK, "paste updated")
 }
 
-func (h *PasteHandler) GetByPublicKey(c echo.Context) error {
-	pubB64 := &PublicKey{}
-	err := c.Bind(pubB64)
+func (h *pasteHandler) GetByPublicKey(c echo.Context) error {
+	pubB64 := c.QueryParam("public_key")
 
+	pastes, err := h.service.GetByPublicKey(c.Request().Context(), pubB64)
 	switch {
+	case err == nil:
+		if len(pastes) == 0 {
+			return echo.NewHTTPError(http.StatusNotFound, "All pastes have expired for this user")
+		}
+		return c.JSONPretty(http.StatusOK, pastes, "\t")
+
 	case err == utils.ErrEmptyUserID:
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request, empty public key")
+
 	case err == utils.ErrInvalidPublicKey:
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
+
 	case err == utils.ErrUnauthorizedAccess:
 		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
+
 	case err == utils.ErrPasteNotFound:
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
-	case err != nil:
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request")
-	}
 
-	pastes, err := h.service.GetByPublicKey(c.Request().Context(), pubB64.PublicKey)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error, failed to get pastes by public key")
+	default:
+		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
-
-	return c.JSON(http.StatusOK, pastes)
 }
