@@ -1,4 +1,4 @@
-# DropKey 
+# KeyDrop 
 
 A minimal, end-to-end encrypted pastebin built with Go. This service allows users to create, share, and fetch encrypted messages without requiring email, passwords, or accounts.
 
@@ -26,7 +26,7 @@ A minimal, end-to-end encrypted pastebin built with Go. This service allows user
 
 ```
 
-DropKey/
+KeyDrop/
 ├── cmd
 │   └── api
 │       └── main.go              # Entry point
