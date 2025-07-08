@@ -49,7 +49,6 @@ KeyDrop/
 │   │   └── middleware.go       # Logging, authentication middleware
 │   └── utils
 │       ├── errors.go           # Custom errors
-│       └── key.go              # Key-based authentication utilities
 ├── go.mod                      # Go module dependencies
 └── README.md                   # Project documentation
 
