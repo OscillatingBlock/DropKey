@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
-	"fmt"
 
 	"Drop-Key/internal/models"
 	"Drop-Key/internal/utils"
@@ -33,7 +32,6 @@ func (u *userService) Create(ctx context.Context, user *models.User) (string, er
 	if user.PublicKey == "" {
 		return "", utils.WrapError(utils.ErrEmptyPublicKey, "Cannot create user, error")
 	}
-	fmt.Println(user.PublicKey)
 
 	existingUser, err := u.repo.GetByPublicKey(ctx, user.PublicKey)
 	if err == nil && existingUser != nil {
