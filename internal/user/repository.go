@@ -2,9 +2,12 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"log/slog"
 
 	"Drop-Key/internal/models"
+	"Drop-Key/internal/utils"
 
 	"github.com/uptrace/bun"
 )
@@ -48,8 +51,11 @@ func (r *userRepository) GetByPublicKey(ctx context.Context, public_key string) 
 	var user models.User
 	err := r.db.NewSelect().Model(&user).Where("public_key = ?", public_key).Scan(ctx)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, utils.ErrUserNotFound
+		}
 		slog.Error("Error while getting user", "opearation", "get", "public_key", public_key[:8], "error", err)
-		return nil, err
+		return nil, utils.ErrUserNotFound
 	}
 	return &user, nil
 }
