@@ -63,12 +63,12 @@ KeyDrop/
 - **Auth:** JWT + Public Key Cryptography
 - **Logger:** `log/slog`
 
-## 🚧 Note
+## Note
 
 - The server **never** sees or stores plain text.
 - Decryption happens **only** client-side using the public key hash in the fragment (`#`) portion of the paste URL.
 
-## 🔗 Related
+## Related
 
 - [Endpoints documentation →](./ENDPOINTS.md) *(Coming Soon)*
 
