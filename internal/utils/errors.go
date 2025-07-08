@@ -17,6 +17,7 @@ var (
 	ErrPasteInvalidSignatureVerification = errors.New("invalid signature verification")
 	ErrPasteInvalidID                    = errors.New("invalid paste ID")
 	ErrPasteNotFound                     = errors.New("paste not found")
+	ErrPasteInvalidExpiryTime            = errors.New("paste has invalid expiry time")
 )
 
 var (
