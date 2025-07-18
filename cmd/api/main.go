@@ -29,7 +29,7 @@ func main() {
 	pasteHandler := paste.NewPasteHandler(pasteService)
 	userHandler := user.NewUserHandler(userService)
 
-	router := router.Router(pasteHandler, userHandler)
+	e := router.Router(pasteHandler, userHandler)
 
-	router.Logger.Fatal(router.Start("127.0.0.1:8080"))
+	e.Logger.Fatal(e.Start("127.0.0.1:8081"))
 }

@@ -12,8 +12,17 @@ import (
 func Router(pasteHandler paste.PasterHandlerInterface, userHandler user.UserHandler) *echo.Echo {
 	e := echo.New()
 
-	e.Pre(middleware.RemoveTrailingSlash())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge:           86400,
+	}))
 
+	e.Pre(middleware.RemoveTrailingSlash())
+	e.Use(custom_middleware.Logger)
 	publicPasteGroup := e.Group("/api/pastes", custom_middleware.Logger)
 	publicPasteGroup.GET("/:id", pasteHandler.GetPaste)
 	publicPasteGroup.GET("", pasteHandler.GetByPublicKey)
