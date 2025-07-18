@@ -58,7 +58,7 @@ KeyDrop/
 
 - **Language:** Go 1.21+
 - **Framework:** Echo
-- **ORM:** Bun (with PostgreSQL)
+- **ORM:** Bun (with MySql)
 - **Auth:** JWT + Public Key Cryptography
 - **Logger:** `log/slog`
 
