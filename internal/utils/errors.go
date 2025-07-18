@@ -47,6 +47,7 @@ var (
 	ErrAuthenticationFailed = errors.New("authentication failed")
 	ErrValidationError      = errors.New("validation error")
 	ErrUserCreationFailed   = errors.New("user creation failed")
+	ErrUserAlreadyExists    = errors.New("user already exists, perform login instead")
 )
 
 func WrapError(err error, message string) error {

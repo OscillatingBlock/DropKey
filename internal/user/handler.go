@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -57,27 +58,29 @@ func (h *userHandler) RegisterHandler(c echo.Context) error {
 		PublicKey: pub.PublicKey,
 	}
 	id, err := h.service.Create(c.Request().Context(), user)
-	switch err {
+	switch {
 
-	case nil:
+	case err == nil:
 		response := &ID{
 			Id: id,
 		}
 		return c.JSON(http.StatusCreated, response)
 
-	case utils.ErrEmptyPublicKey:
+	case errors.Is(err, utils.ErrEmptyPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty public key")
 
-	case utils.ErrInvalidPublicKey:
+	case errors.Is(err, utils.ErrInvalidPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
 
-	case utils.ErrUserCreationFailed:
+	case errors.Is(err, utils.ErrUserCreationFailed):
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error.")
 
-	case utils.ErrDuplicatePublicKey:
+	case errors.Is(err, utils.ErrDuplicatePublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "User already exists")
 
 	default:
+		pubKeyB64, _ := base64.StdEncoding.DecodeString(user.PublicKey)
+		slog.Error("Error while registering user with publicKey", "publicKey", string(pubKeyB64), "error", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error..")
 	}
 }
@@ -154,17 +157,17 @@ func (h *userHandler) GetByPublicKeyHandler(c echo.Context) error {
 
 	user, err := h.service.GetByPublicKey(c.Request().Context(), publicKey)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return c.JSON(http.StatusOK, user)
 
-	case utils.ErrEmptyPublicKey:
+	case errors.Is(err, utils.ErrEmptyPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty publickey")
 
-	case utils.ErrInvalidPublicKey:
+	case errors.Is(err, utils.ErrInvalidPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key — ensure it is URL-encoded")
 
-	case utils.ErrUserNotFound:
+	case errors.Is(err, utils.ErrUserNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 
 	default:
@@ -179,14 +182,14 @@ func (h *userHandler) GetByIDHandler(c echo.Context) error {
 	}
 	user, err := h.service.GetByID(c.Request().Context(), id)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return c.JSON(http.StatusOK, user)
-	case utils.ErrEmptyUserID:
+	case errors.Is(err, utils.ErrEmptyUserID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty id")
-	case utils.ErrInvalidUserID:
+	case errors.Is(err, utils.ErrInvalidUserID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid id")
-	case utils.ErrUserNotFound:
+	case errors.Is(err, utils.ErrUserNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "User not found")
 
 	default:

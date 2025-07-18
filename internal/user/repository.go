@@ -28,10 +28,11 @@ func NewUserRepository(db *bun.DB) *userRepository {
 	}
 }
 
+// TODO Fix user already exists error
 func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	_, err := r.db.NewInsert().Model(user).Exec(ctx)
 	if err != nil {
-		slog.Error("Error while inserting user", "operation", "create", "userid", user.ID)
+		slog.Error("Error while inserting user", "operation", "create", "publickey", user.PublicKey)
 		return err
 	}
 	return nil
@@ -54,8 +55,8 @@ func (r *userRepository) GetByPublicKey(ctx context.Context, public_key string) 
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, utils.ErrUserNotFound
 		}
-		slog.Error("Error while getting user", "opearation", "get", "public_key", public_key[:8], "error", err)
-		return nil, utils.ErrUserNotFound
+		slog.Error("Error while getting user", "operation", "get", "public_key", public_key[:8], "error", err)
+		return nil, err
 	}
 	return &user, nil
 }

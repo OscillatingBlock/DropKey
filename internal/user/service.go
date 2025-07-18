@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
+	"log/slog"
 
 	"Drop-Key/internal/models"
 	"Drop-Key/internal/utils"
@@ -33,17 +35,22 @@ func (u *userService) Create(ctx context.Context, user *models.User) (string, er
 		return "", utils.WrapError(utils.ErrEmptyPublicKey, "Cannot create user, error")
 	}
 
-	existingUser, err := u.repo.GetByPublicKey(ctx, user.PublicKey)
-	if err == nil && existingUser != nil {
-		return "", utils.WrapError(utils.ErrDuplicatePublicKey, "Cannot create user, error")
-	}
 	publicKey, err := base64.StdEncoding.DecodeString(user.PublicKey)
 	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		return "", utils.WrapError(utils.ErrInvalidPublicKey, "Cannot create user, error")
 	}
 
-	user.ID = uuid.NewString()
+	existingUser, err := u.repo.GetByPublicKey(ctx, base64.StdEncoding.EncodeToString(publicKey))
+	slog.Info("public key in create user", "publicKey", base64.StdEncoding.EncodeToString(publicKey))
+	if err == nil && existingUser != nil {
+		slog.Info("after get by public key", "userID", existingUser.ID)
+		return "", utils.WrapError(utils.ErrDuplicatePublicKey, "Cannot create user, error")
+	}
+	if err != nil && !errors.Is(err, utils.ErrUserNotFound) {
+		return "", utils.WrapError(err, "Unexpected DB error")
+	}
 
+	user.ID = uuid.NewString()
 	err = u.repo.Create(ctx, user)
 	if err != nil {
 		return "", utils.WrapError(utils.ErrUserCreationFailed, "Failed to create user")
