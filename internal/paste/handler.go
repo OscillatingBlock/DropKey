@@ -1,6 +1,8 @@
 package paste
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -75,33 +77,36 @@ func (h *pasteHandler) CreatePaste(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, err := h.service.Create(ctx, paste, pasteReq.Expires_in)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 
-	case utils.ErrPasteExpiredAlready:
+	case errors.Is(err, utils.ErrPasteExpiredAlready):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid expiresin, paste expired already")
-	case utils.ErrPasteExpiryTooLong:
+	case errors.Is(err, utils.ErrPasteExpiryTooLong):
 		return echo.NewHTTPError(http.StatusBadRequest, "Expiry date too long")
-	case utils.ErrPasteEmptyCiphertext:
+	case errors.Is(err, utils.ErrPasteEmptyCiphertext):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty ciphertext")
-	case utils.ErrPasteInvalidCiphertext:
+	case errors.Is(err, utils.ErrPasteInvalidCiphertext):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ciphertext")
-	case utils.ErrEmptySignature:
+	case errors.Is(err, utils.ErrEmptySignature):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty signature")
-	case utils.ErrInvalidSignature:
+	case errors.Is(err, utils.ErrInvalidSignature):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid signature")
-	case utils.ErrEmptyPublicKey:
+	case errors.Is(err, utils.ErrEmptyPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Empty public key")
-	case utils.ErrInvalidPublicKey:
+	case errors.Is(err, utils.ErrInvalidPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
-	case utils.ErrPasteUserNotFound:
+	case errors.Is(err, utils.ErrPasteUserNotFound):
 		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
-	case utils.ErrPasteInvalidSignatureVerification:
+	case errors.Is(err, utils.ErrPasteInvalidSignatureVerification):
 		return echo.NewHTTPError(http.StatusBadRequest, "Signature verification failed")
+
 	default:
+		slog.Error("error while creating paste", "error", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
 
+	slog.Info("paste created with ", "pasteid", paste.ID, "url", getUrl(id, paste.PublicKey))
 	return c.JSON(http.StatusCreated, map[string]string{
 		"id":  paste.ID,
 		"url": getUrl(id, paste.PublicKey),
@@ -127,11 +132,11 @@ func (h *pasteHandler) GetPaste(c echo.Context) error {
 	paste, err := h.service.GetByID(ctx, id)
 
 	switch {
-	case err == utils.ErrPasteInvalidID:
+	case errors.Is(err, utils.ErrPasteInvalidID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid paste ID")
-	case err == utils.ErrPasteNotFound:
+	case errors.Is(err, utils.ErrPasteNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
-	case err == utils.ErrPasteExpiredAlready:
+	case errors.Is(err, utils.ErrPasteExpiredAlready):
 		return echo.NewHTTPError(http.StatusGone, "Paste already expired")
 	case err != nil:
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
@@ -168,17 +173,18 @@ func (h *pasteHandler) UpdatePaste(c echo.Context) error {
 
 	ctx := c.Request().Context()
 	err := h.service.Update(ctx, paste, pasteReq.Expires_in)
+
 	switch {
-	case err == utils.ErrPasteNotFound:
+	case errors.Is(err, utils.ErrPasteNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
 
-	case err == utils.ErrPasteInvalidExpiryTime:
+	case errors.Is(err, utils.ErrPasteInvalidExpiryTime):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid expires_in")
 
-	case err == utils.ErrUnauthorizedAccess:
+	case errors.Is(err, utils.ErrUnauthorizedAccess):
 		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
 
-	case err == utils.ErrPasteInvalidCiphertext:
+	case errors.Is(err, utils.ErrPasteInvalidCiphertext):
 		return echo.NewHTTPError(http.StatusBadRequest, "Bad request, invalid cipher text")
 
 	case err != nil:
@@ -192,6 +198,7 @@ func (h *pasteHandler) GetByPublicKey(c echo.Context) error {
 	pubB64 := c.QueryParam("public_key")
 
 	pastes, err := h.service.GetByPublicKey(c.Request().Context(), pubB64)
+
 	switch {
 	case err == nil:
 		if len(pastes) == 0 {
@@ -199,16 +206,16 @@ func (h *pasteHandler) GetByPublicKey(c echo.Context) error {
 		}
 		return c.JSONPretty(http.StatusOK, pastes, "\t")
 
-	case err == utils.ErrEmptyUserID:
+	case errors.Is(err, utils.ErrEmptyUserID):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request, empty public key")
 
-	case err == utils.ErrInvalidPublicKey:
+	case errors.Is(err, utils.ErrInvalidPublicKey):
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid public key")
 
-	case err == utils.ErrUnauthorizedAccess:
+	case errors.Is(err, utils.ErrUnauthorizedAccess):
 		return echo.NewHTTPError(http.StatusUnauthorized, "Unauthorized access")
 
-	case err == utils.ErrPasteNotFound:
+	case errors.Is(err, utils.ErrPasteNotFound):
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
 
 	default:
