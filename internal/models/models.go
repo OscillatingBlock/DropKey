@@ -11,7 +11,7 @@ type User struct {
 
 type Paste struct {
 	ID         string    `bun:"id,pk" json:"id"`
-	Ciphertext string    `bun:"ciphertext,notnull" json:"ciphertext"`
+	Ciphertext string    `bun:"type:MEDIUMTEXT,notnull" json:"ciphertext"`
 	Signature  string    `bun:"signature,notnull" json:"signature"`
 	PublicKey  string    `bun:"public_key,notnull" json:"public_key"`
 	ExpiresAt  time.Time `bun:"expires_at,notnull" json:"expires_at"`
