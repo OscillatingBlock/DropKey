@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	"Drop-Key/internal/db"
 	"Drop-Key/internal/paste"
 	"Drop-Key/internal/router"
 	"Drop-Key/internal/user"
+
 	"github.com/joho/godotenv"
 )
 
@@ -31,5 +33,9 @@ func main() {
 
 	e := router.Router(pasteHandler, userHandler)
 
-	e.Logger.Fatal(e.Start("127.0.0.1:8081"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+	e.Logger.Fatal(e.Start("0.0.0.0:" + port))
 }
