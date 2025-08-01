@@ -201,9 +201,7 @@ func (h *pasteHandler) GetByPublicKey(c echo.Context) error {
 
 	switch {
 	case err == nil:
-		if len(pastes) == 0 {
-			return echo.NewHTTPError(http.StatusNotFound, "All pastes have expired for this user")
-		}
+		
 		return c.JSONPretty(http.StatusOK, pastes, "\t")
 
 	case errors.Is(err, utils.ErrEmptyUserID):
@@ -219,6 +217,7 @@ func (h *pasteHandler) GetByPublicKey(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "Paste not found")
 
 	default:
+    slog.Error("Error while getting all pastes" , "error", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Internal server error")
 	}
 }
